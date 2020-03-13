@@ -1,6 +1,8 @@
-authors = ["kylebrown <kylejbrown17@gmail.com>"]
 name = "AA229project"
 uuid = "282a1f54-63ef-11ea-2f47-2f71a381a25b"
+authors = ["kylebrown <kylejbrown17@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+GraphUtils = "5d4bc1c0-0fb7-11e9-3252-b1aa07358cab"
+POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
