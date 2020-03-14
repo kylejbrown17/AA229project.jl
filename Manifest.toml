@@ -31,6 +31,11 @@ git-tree-sha1 = "05916673a2627dd91b4969ff8ba6941bc85a960e"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.6.0"
 
+[[Crayons]]
+git-tree-sha1 = "cb7a62895da739fe5bb43f1a26d4292baf4b3dc0"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.0.1"
+
 [[DataAPI]]
 git-tree-sha1 = "674b67f344687a88310213ddfa8a2b3c76cc4252"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -169,9 +174,15 @@ version = "1.1.0"
 
 [[PDMats]]
 deps = ["Arpack", "LinearAlgebra", "SparseArrays", "SuiteSparse", "Test"]
-git-tree-sha1 = "5f303510529486bb02ac4d70da8295da38302194"
+git-tree-sha1 = "2fc6f50ddd959e462f0a2dbc802ddf2a539c6e35"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
-version = "0.9.11"
+version = "0.9.12"
+
+[[POMDPModelTools]]
+deps = ["Distributions", "LinearAlgebra", "POMDPs", "Random", "SparseArrays", "Statistics", "UnicodePlots"]
+git-tree-sha1 = "f6730274a3dd085e1806b0aa6aaf2bb35e50481f"
+uuid = "08074719-1b2a-587c-a292-00f91cc44415"
+version = "0.2.2"
 
 [[POMDPs]]
 deps = ["Distributions", "LibGit2", "LightGraphs", "Logging", "NamedTupleTools", "Pkg", "Random", "Statistics"]
@@ -308,3 +319,9 @@ uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+
+[[UnicodePlots]]
+deps = ["Crayons", "Dates", "SparseArrays", "StatsBase"]
+git-tree-sha1 = "af0c29913f108f649999e74098814c7ef0f644de"
+uuid = "b8865327-cd53-5732-bb35-84acbb429228"
+version = "1.2.0"

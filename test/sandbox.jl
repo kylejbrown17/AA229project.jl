@@ -6,6 +6,9 @@ using LightGraphs
 using LinearAlgebra
 using GraphUtils
 using TaskGraphs
+using Parameters
+using Distributions
+using Random
 
 # Tiger POMDP example
 let
@@ -68,67 +71,42 @@ let
         env_scale = 0.5,
         transition_time=2.0
         )
-    factory_env.vtx_map
+    factory_env
 
-    # Observation model
-    o_kernel = [
-        0  1  1  1  0;
-        1  1  1  1  1;
-        1  1  1  1  1;
-        1  1  1  1  1;
-        0  1  1  1  0;
-    ]
-    o_ctr = [3,3]
-    x_idxs = 1-o_ctr[1]:size(o_kernel,1)-o_ctr[1]
-    y_idxs = 1-o_ctr[2]:size(o_kernel,2)-o_ctr[2]
-    obs_map = map(v->Int[],vertices(factory_env))
-    for v in vertices(factory_env)
-        vtx = factory_env.vtxs[v]
-        for (dx,dy) in Base.Iterators.product(x_idxs,y_idxs)
-            vtx2 = (vtx[1]+dx, vtx[2]+dy)
-            v2 = get(factory_env.vtx_map, vtx2, -1)
-            if v2 != v && v2 > 0 && o_kernel[dx+o_ctr[1],dy+o_ctr[2]] > 0
-                visible = true
-                # exclude blocked cells that are around a corner
-                for (x,y) in Base.Iterators.product(min(vtx[1],vtx2[1]):max(vtx[1],vtx2[1]),min(vtx[2],vtx2[2]):max(vtx[2],vtx2[2]))
-                    if (x,y) != vtx && (x,y) != vtx2 && get(factory_env.vtx_map,(x,y), -1) <= 0
-                        p1 = [vtx...]
-                        p2 = [vtx2...]
-                        p = [x,y]
-                        d = ((p2 - p1)/norm(p2-p1))*dot((p-p1),(p2 - p1)/norm(p2 - p1))
-                        if norm(p-p1-d) < 0.5
-                            # @show v,v2,p-p1,d
-                            visible = false
-                        end
-                    end
-                end
-                if visible
-                    push!(obs_map[v], factory_env.vtx_map[vtx[1]+dx, vtx[2]+dy])
-                end
-            end
-        end
-        sort!(obs_map[v])
-    end
-    factory_env.vtx_map, obs_map
+    pomdp = FactoryPOMDP(
+        starts = [1,2],
+        goals = [50,51],
+        n_intruders = 1,
+        env = factory_env,
+        action_cache = factory_env.edge_cache,
+        obs_map = generate_obs_model(factory_env)
+    )
 
-    # Reward function
-    function collision_penalty(vr,vh,G)
-        if vr == vh
-            return -1000.0
-        elseif vh in outneighbors(G,vr)
-            return -10.0
-        else
-            return 0.0
-        end
-    end
-    function goal_reward(v,t,goal,t_goal)
-        if v == goal
-            return 10.0
-        elseif t > t_goal
-            return -1.0
-        else
-            return 0.0
-        end
-    end
+    n_states(pomdp)
+    states(pomdp)
+
+    s = FactoryState(
+        (RobotState((4,1),0),RobotState((1,2),0),),
+        (RobotState((2,1),0),)
+    )
+    stateindex(pomdp,s)
+
+    a = ((0,0),(0,0))
+    actionindex(pomdp,a)
+
+    sp = transition(pomdp,s,a)
+    sp.robot_states,sp.intruder_states
+
+    o = Observation(state=sp)
+    o.intruders_observed
+    obs_dist = observation(pomdp,a,sp)
+
+    possible_actions = actions(pomdp,s)
+
+    s0_dist = initialstate_distribution(pomdp)
+    rng = MersenneTwister(0)
+    s0 = rand(rng,s0_dist)
+
+    reward(pomdp,s,a)
 
 end
