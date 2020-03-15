@@ -92,6 +92,21 @@ struct ActionSpace{T<:Tuple}
 end
 
 export
+    generate_action_index_dict
+
+function generate_action_index_dict(N)
+    possible_actions = (
+        (-1,0),
+        (0,0),
+        (0,-1),
+        (0,1),
+        (1,0)
+    )
+    actions = collect(Base.Iterators.product(map(i->possible_actions,1:N)...))[:]
+    Dict(a=>i for (i,a) in enumerate(actions))
+end
+
+export
     Observation
 
 @with_kw struct Observation{N,M}
@@ -122,7 +137,7 @@ export
     n_intruders::Int        = 1
     env::E                  = Graph()
     action_cache::Vector{Set{VTX}} = Vector{Set{VTX}}()
-    # action_index_cache::Dict{NTuple{N,VTX},Int}=Dict{NTuple{N,VTX},Int}()
+    action_index_cache::Dict{NTuple{N,VTX},Int} = generate_action_index_dict(n_robots)
     # Observation
     obs_map::Vector{Vector{Int}} = Vector{Vector{Int}}()
 end
@@ -194,35 +209,23 @@ function POMDPs.actions(m::FactoryPOMDP{E,N,M}) where {E,N,M}
         ))[:]
 end
 function POMDPs.actionindex(m::FactoryPOMDP,action::NTuple{N,VTX}) where {N}
-    @assert m.n_robots == N
-    possible_actions = get_possible_actions(m)
-    idx = 0
-    i = 0
-    for a in action
-        for (j,at) in enumerate(possible_actions)
-            if a == at
-                idx += j*N^i
-                i += 1
-                break
-            end
-        end
-    end
-    return idx
+    m.action_index_cache[action]
+    # @assert m.n_robots == N
+    # possible_actions = get_possible_actions(m)
+    # idx = 0
+    # i = 0
+    # for a in action
+    #     for (j,at) in enumerate(possible_actions)
+    #         if a == at
+    #             idx += j*N^i
+    #             i += 1
+    #             break
+    #         end
+    #     end
+    # end
+    # return idx
 end
-export
-    generate_action_index_dict
 
-function generate_action_index_dict(N)
-    possible_actions = (
-        (-1,0),
-        (0,0),
-        (0,-1),
-        (0,1),
-        (1,0)
-    )
-    actions = collect(Base.Iterators.product(map(i->possible_actions,1:N)...))[:]
-    Dict(a=>i for (i,a) in enumerate(actions))
-end
 generate_action_index_dict(m::FactoryPOMDP) = generate_action_index_dict(m.n_robots)
 
 export
