@@ -63,50 +63,83 @@ end
 # Factory environment
 let
     factory_env = construct_regular_factory_world(;
-        n_obstacles_x=3,
-        n_obstacles_y=3,
+        n_obstacles_x=1,
+        n_obstacles_y=1,
         obs_width = [2;2],
         obs_offset = [1;1],
         env_pad = [0;0],
-        env_scale = 0.5,
-        transition_time=2.0
         )
     factory_env
 
-    pomdp = FactoryPOMDP(
+    N = 2
+    M = 1
+    E = typeof(factory_env)
+    pomdp = FactoryPOMDP{E,N,M}(
         starts = [1,2],
         goals = [50,51],
         n_intruders = 1,
+        deadline=4,
         env = factory_env,
         action_cache = factory_env.edge_cache,
         obs_map = generate_obs_model(factory_env)
     )
 
+    # m = DiscreteExplicitPOMDP(S,A,O,T,Z,R,γ)
+    solver = QMDPSolver()
+    @requirements_info solver pomdp
+    policy = solve(solver, pomdp)
+
     n_states(pomdp)
     states(pomdp)
+    for (i,s) in enumerate(states(pomdp))
+        # @show s.robot_states[1].vtx, s.robot_states[2].vtx, s.intruder_states[1].vtx, s.t
+        # @show i, stateindex(pomdp,s)
+        @assert i == stateindex(pomdp,s)
+        # if s.t > 3
+        # if s.intruder_states[1].vtx > (1,2)
+        #     break
+        # end
+    end
 
     s = FactoryState(
         (RobotState((4,1),0),RobotState((1,2),0),),
-        (RobotState((2,1),0),)
+        (RobotState((2,1),0),),
+        0
     )
     stateindex(pomdp,s)
-
-    a = ((0,0),(0,0))
-    actionindex(pomdp,a)
-
-    sp = transition(pomdp,s,a)
-    sp.robot_states,sp.intruder_states
-
-    o = Observation(state=sp)
-    o.intruders_observed
-    obs_dist = observation(pomdp,a,sp)
-
-    possible_actions = actions(pomdp,s)
 
     s0_dist = initialstate_distribution(pomdp)
     rng = MersenneTwister(0)
     s0 = rand(rng,s0_dist)
+    rand(rng,s0_dist)
+    support(s0_dist)
+    pdf(s0_dist,s0_dist.vals[1])
+    mode(s0_dist)
+    # mean(s0_dist)
+
+    a = ((0,0),(0,0))
+    actionindex(pomdp,a)
+
+    sp_dist = transition(pomdp,s,a)
+    sp = rand(rng,sp_dist)
+    rand(rng,sp_dist)
+    support(sp_dist)
+    pdf(sp_dist,sp_dist.vals[1])
+    mode(sp_dist)
+    # mean(sp_dist)
+
+    o = Observation(state=sp)
+    o.intruders_observed
+    obs_dist = observation(pomdp,a,sp)
+    rand(rng,obs_dist)
+    support(obs_dist)
+    pdf(obs_dist,obs_dist.val)
+    mode(obs_dist)
+    mean(obs_dist)
+
+    possible_actions = actions(pomdp,s)
+    actions(pomdp)
+    generate_action_index_dict(pomdp)
 
     reward(pomdp,s,a)
-
 end
