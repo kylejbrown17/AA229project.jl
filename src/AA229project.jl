@@ -34,8 +34,7 @@ Base.show(io::IO,s::FactoryState) = print(io,
 
 @with_kw struct FactoryStateSpace{N,M}
     vtxs::Vector{VTX}       = Vector{VTX}()
-    # n_robots::Int           = 0
-    # n_intruders::Int        = 0
+    vtx_map::Matrix{Int}    = zeros(1,1)
     t_max::Int              = 1
 end
 Base.length(S::FactoryStateSpace{N,M}) where {N,M} = (S.t_max+1)*length(S.vtxs)^(N+M)
@@ -49,14 +48,38 @@ function Base.rand(rng::AbstractRNG, S::FactoryStateSpace{N,M}) where {N,M}
         )
 end
 
-# struct StateIter
-#     s::Int # source state
-#     neighbor_list::Vector{Int} # length of target edge list
-# end
-# struct IterState
-#     idx::Int # idx of target node
-# end
-# ActionIterState() = ActionIterState(0)
+export
+    state_to_idx,
+    idx_to_state
+
+function state_to_idx(S::FactoryStateSpace{N,M}, state::FactoryState{N,M}) where {N,M}
+    n = length(S.vtxs)
+    idx = 1
+    i = 0
+    for s in reverse([state.robot_states..., state.intruder_states...])
+        v = S.vtx_map[s.vtx...]
+        idx += (1+S.t_max)*(v-1)*n^i
+        i += 1
+    end
+    idx += state.t
+
+    idx
+end
+function idx_to_state(S::FactoryStateSpace{N,M}, idx::Int) where {N,M}
+    n = length(S.vtxs)
+    idx,t = divrem(idx,S.t_max+1)
+    i_vtxs = RobotState[]
+    for j in 1:M
+        idx,v = divrem(idx,n)
+        push!(i_vtxs,RobotState(S.vtxs[v+1],t))
+    end
+    r_vtxs = RobotState[]
+    for i in 1:N
+        idx,v = divrem(idx,n)
+        push!(r_vtxs,RobotState(S.vtxs[v+1],t))
+    end
+    FactoryState(tuple(reverse(r_vtxs)...),tuple(reverse(i_vtxs)...),t)
+end
 function Base.iterate(S::FactoryStateSpace{N,M}) where {N,M}
     return iterate(S,0)
 end
@@ -64,23 +87,7 @@ function Base.iterate(S::FactoryStateSpace{N,M}, iter_state::Int) where {N,M}
     if iter_state >= length(S)
         return nothing
     end
-    idx = iter_state
-    idx,t = divrem(idx,S.t_max+1)
-    # t,idx = divrem(idx,div(length(S),(S.t_max+1)))
-    # @show t
-    i_vtxs = RobotState[]
-    for j in 1:M
-        idx,v = divrem(idx,length(S.vtxs))
-        # @show v,j
-        push!(i_vtxs,RobotState(S.vtxs[v+1],t))
-    end
-    r_vtxs = RobotState[]
-    for i in 1:N
-        idx,v = divrem(idx,length(S.vtxs))
-        # @show v,i
-        push!(r_vtxs,RobotState(S.vtxs[v+1],t))
-    end
-    FactoryState(tuple(reverse(r_vtxs)...),tuple(reverse(i_vtxs)...),t), iter_state+1
+    idx_to_state(S,iter_state), iter_state+1
 end
 
 export
@@ -115,6 +122,75 @@ export
 end
 
 export
+    ObservationSpace,
+    obs_to_idx,
+    idx_to_obs
+
+struct ObservationSpace{N,M}
+    S::FactoryStateSpace{N,M}
+end
+Base.length(O::ObservationSpace{N,M}) where {N,M} = (O.S.t_max+1)*(length(O.S.vtxs)^N)*((length(O.S.vtxs)+1)^M) # one extra "invisible" state for each agent
+POMDPs.dimensions(O::ObservationSpace{N,M}) where {N,M} = 1+N+M
+function Base.rand(rng::AbstractRNG, O::ObservationSpace{N,M}) where {N,M}
+    s = rand(rng,O.S)
+    intruders_observed = tuple(rand(rng,Bool,M))
+    return Observation{N,M}(s,intruders_observed)
+end
+
+function obs_to_idx(O::ObservationSpace{N,M}, o::Observation{N,M}) where {N,M}
+    S = O.S
+    state = o.state
+    n = length(S.vtxs)
+    idx = 1
+    i = 0
+    for (s,t) in zip(reverse(state.intruder_states),reverse(o.intruders_observed))
+        v = t ? get(S.vtx_map,s.vtx,n+1) : n+1
+        # v = get(S.vtx_map,s.vtx,n+1)
+        idx += (1+S.t_max)*(v-1)*(n+1)^i
+        i += 1
+    end
+    k = 0
+    for s in reverse(state.robot_states)
+        v = S.vtx_map[s.vtx...]
+        idx += (1+S.t_max)*((n+1)^i)*(v-1)*n^k
+        k += 1
+    end
+    idx += state.t
+
+    idx
+end
+function idx_to_obs(O::ObservationSpace{N,M}, idx::Int) where {N,M}
+    S = O.S
+    n = length(S.vtxs)
+    idx,t = divrem(idx,S.t_max+1)
+    intruders_visible = ones(Bool,M)
+    i_vtxs = RobotState[]
+    for j in 1:M
+        idx,v = divrem(idx,n+1)
+        if v == n
+            intruders_visible[j] = false
+        end
+        push!(i_vtxs,RobotState(get(S.vtxs,v+1,(-1,-1)),t))
+    end
+    r_vtxs = RobotState[]
+    for i in 1:N
+        idx,v = divrem(idx,n)
+        push!(r_vtxs,RobotState(S.vtxs[v+1],t))
+    end
+    s = FactoryState(tuple(reverse(r_vtxs)...),tuple(reverse(i_vtxs)...),t)
+    o = Observation{N,M}(s,tuple(reverse(intruders_visible)...))
+end
+function Base.iterate(O::ObservationSpace{N,M}) where {N,M}
+    return iterate(O,0)
+end
+function Base.iterate(O::ObservationSpace{N,M}, iter_state::Int) where {N,M}
+    if iter_state >= length(O)
+        return nothing
+    end
+    idx_to_obs(O,iter_state), iter_state+1
+end
+
+export
     FactoryPOMDP
 
 @with_kw struct FactoryPOMDP{E,N,M} <: POMDP{FactoryState{N,M},Action{N},Observation{N,M}}
@@ -132,9 +208,10 @@ export
     goals::Vector{Int}      = Int[]
     starts::Vector{Int}     = Int[]
     goal_times::Vector{Int} = map(g->0,goals)
-    deadline::Int           = 100 # simulation ends at T=100
     n_robots::Int           = length(goals)
-    n_intruders::Int        = 1
+    intruder_start_dist::Vector{Vector{Int}} = Vector{Vector{Int}}()
+    n_intruders::Int        = length(intruder_start_dist)
+    deadline::Int           = 100 # simulation ends at T=100
     env::E                  = Graph()
     action_cache::Vector{Set{VTX}} = Vector{Set{VTX}}()
     action_index_cache::Dict{NTuple{N,VTX},Int} = generate_action_index_dict(n_robots)
@@ -148,6 +225,9 @@ export
 
 function POMDPs.isterminal(m::FactoryPOMDP,s::FactoryState)
     terminal = true
+    if s.t > m.deadline
+        return true
+    end
     for (rs,goal,t_goal) in zip(s.robot_states,m.goals,m.goal_times)
         if m.env.vtx_map[rs.vtx...] != goal || rs.t < t_goal
             terminal = false # not all robots are done
@@ -161,30 +241,32 @@ function POMDPs.isterminal(m::FactoryPOMDP,s::FactoryState)
     terminal
 end
 
-POMDPs.states(m::FactoryPOMDP{E,N,M}) where {E,N,M} = FactoryStateSpace{N,M}(vtxs = m.env.vtxs,t_max = m.deadline)
+POMDPs.states(m::FactoryPOMDP{E,N,M}) where {E,N,M} = FactoryStateSpace{N,M}(vtxs = m.env.vtxs,vtx_map = m.env.vtx_map, t_max = m.deadline)
 POMDPs.n_states(m::FactoryPOMDP) = length(states(m))
 function POMDPs.stateindex(m::FactoryPOMDP, state::FactoryState)
-    S = states(m)
-    n = length(S.vtxs)
-    idx = 1
-    i = 0
-    # for s in [state.robot_states..., state.intruder_states...]
-    for s in reverse([state.robot_states..., state.intruder_states...])
-        v = m.env.vtx_map[s.vtx...]
-        idx += (1+S.t_max)*(v-1)*n^i
-        i += 1
-    end
-    idx += state.t
-
-    idx
+    state_to_idx(states(m),state)
+    # S = states(m)
+    # n = length(S.vtxs)
+    # idx = 1
+    # i = 0
+    # # for s in [state.robot_states..., state.intruder_states...]
+    # for s in reverse([state.robot_states..., state.intruder_states...])
+    #     v = m.env.vtx_map[s.vtx...]
+    #     idx += (1+S.t_max)*(v-1)*n^i
+    #     i += 1
+    # end
+    # idx += state.t
+    #
+    # idx
 end
 function POMDPs.initialstate_distribution(m::FactoryPOMDP{E,N,M}) where {E,N,M}
     t0 = 0
 
     robot_states=tuple(map(v->RobotState(m.env.vtxs[v],t0),m.starts)...)
     s0_vector = Vector{FactoryState{N,M}}()
-    vtxs = m.env.vtxs
-    for vtx_list in Base.Iterators.product(map(i->vtxs,1:M)...)
+    # vtxs = m.env.vtxs
+    for vtx_list in Base.Iterators.product(map(v_list->map(v->m.env.vtxs[v],v_list), m.intruder_start_dist)...)
+    # for vtx_list in Base.Iterators.product(map(i->vtxs,1:M)...)
         push!(s0_vector,
             FactoryState(
                 robot_states = robot_states,
@@ -250,12 +332,6 @@ function POMDPs.transition(m::FactoryPOMDP,s::S,a) where {S<:FactoryState}
         )
     end
     SparseCat(sp_vector,ones(length(sp_vector))/length(sp_vector))
-    # intruder_actions = map(state->rand(get_possible_actions(m,state)),s.intruder_states)
-    # sp = FactoryState(
-    #     robot_states = tuple(map(sa->robot_transition(m,sa...),zip(s.robot_states,a))...),
-    #     intruder_states = tuple(map(sa->robot_transition(m,sa...),zip(s.intruder_states,intruder_actions))...)
-    # )
-    # return a distribution
 end
 
 
@@ -321,6 +397,9 @@ function POMDPs.observation(m::FactoryPOMDP,a,sp)
     o = Observation(sp,tuple(intruders_observed...))
     Deterministic(o)
 end
+POMDPs.observations(m::FactoryPOMDP{E,N,M}) where {E,N,M} = ObservationSpace(states(m))
+POMDPs.obsindex(m::FactoryPOMDP{E,N,M},o) where {E,N,M} = obs_to_idx(observations(m),o)
+
 
 function POMDPs.reward(m::FactoryPOMDP,s,a)
     r = 0.0

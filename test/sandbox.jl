@@ -1,6 +1,7 @@
 using Pkg
 Pkg.activate("/home/kylebrown/Repos/AA229_project")
 using POMDPs, QuickPOMDPs, POMDPSimulators, QMDP
+using SARSOP
 using AA229project
 using LightGraphs
 using LinearAlgebra
@@ -77,7 +78,8 @@ let
     pomdp = FactoryPOMDP{E,N,M}(
         starts = [1,2],
         goals = [50,51],
-        n_intruders = 1,
+        # intruder_start_dist = [vertices(factory_env)],
+        intruder_start_dist = [[1],],
         deadline=4,
         env = factory_env,
         action_cache = factory_env.edge_cache,
@@ -86,27 +88,21 @@ let
 
     # m = DiscreteExplicitPOMDP(S,A,O,T,Z,R,γ)
     solver = QMDPSolver()
-    @requirements_info solver pomdp
+    @requirements_info QMDPSolver() pomdp
+    @requirements_info SARSOPSolver() pomdp
     policy = solve(solver, pomdp)
 
     n_states(pomdp)
     states(pomdp)
     for (i,s) in enumerate(states(pomdp))
-        # @show s.robot_states[1].vtx, s.robot_states[2].vtx, s.intruder_states[1].vtx, s.t
-        # @show i, stateindex(pomdp,s)
         @assert i == stateindex(pomdp,s)
-        # if s.t > 3
-        # if s.intruder_states[1].vtx > (1,2)
-        #     break
-        # end
     end
-
-    s = FactoryState(
-        (RobotState((4,1),0),RobotState((1,2),0),),
-        (RobotState((2,1),0),),
-        0
-    )
-    stateindex(pomdp,s)
+    for (i,a) in enumerate(actions(pomdp))
+        @assert i == actionindex(pomdp,a)
+    end
+    for (i,o) in enumerate(observations(pomdp))
+        @assert i == obsindex(pomdp,o)
+    end
 
     s0_dist = initialstate_distribution(pomdp)
     rng = MersenneTwister(0)
