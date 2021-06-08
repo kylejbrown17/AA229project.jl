@@ -87,9 +87,10 @@ let
     )
 
     # m = DiscreteExplicitPOMDP(S,A,O,T,Z,R,γ)
-    solver = QMDPSolver()
     @requirements_info QMDPSolver() pomdp
     @requirements_info SARSOPSolver() pomdp
+    # solver = SARSOPSolver()
+    solver = QMDPSolver()
     policy = solve(solver, pomdp)
 
     n_states(pomdp)
